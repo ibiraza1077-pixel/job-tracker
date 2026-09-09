@@ -1,202 +1,68 @@
+# Job Tracker
 
-A production-grade full-stack web application for managing job applications throughout the recruitment process. Built with modern web technologies and industry-standard practices, this system enables efficient tracking of application statuses, company information, and timeline management.
-Live Application: https://job-tracker-liart-theta.vercel.app
-Technology Stack
-Frontend Architecture
+Track job applications with a React interface and an Express/PostgreSQL API. Users register or sign in, then manage their own applications across Applied, Interview, Offer and Rejected statuses.
 
-React - Component-based UI library
-JavaScript (ES6+) - Modern ECMAScript standards
-CSS3 - Responsive design and custom styling
-Vercel - Continuous deployment platform
+## Architecture
 
-Backend Infrastructure
+- `frontend/src/JobTracker.jsx`: React 19 interface, Axios requests and authentication state.
+- `backend/index.js`: Express 5 API, bcrypt password hashing, JWT authentication and parameterised SQL.
+- `backend/schema.sql`: users and applications, foreign keys and an index for each user's application history.
 
-Node.js - Server-side JavaScript runtime
-Express.js - Minimalist web framework
-TypeScript - Statically typed superset of JavaScript
-PostgreSQL - Enterprise-grade relational database
-Railway - Cloud platform for backend services and database hosting
+The backend is JavaScript. This repository does not implement a TypeScript backend, MVC layers or live multi-user updates.
 
-Development Environment
+## Run locally
 
-Git & GitHub - Distributed version control
-npm - Dependency management
-REST API - Architectural style for networked applications
+Requires Node.js 22.12+ and PostgreSQL 16. Create a dedicated local database:
 
-Core Features
-Application Management
+```sh
+createdb job_tracker
+psql -d job_tracker -v ON_ERROR_STOP=1 -f backend/schema.sql
+cd backend
+npm ci
+cp .env.example .env
+openssl rand -hex 32
+```
 
-Create, read, update, and delete job application records
-Track multiple status stages (Applied, Interview, Offer, Rejected)
-Maintain chronological records with submission dates
-Persistent data storage with PostgreSQL
+Put the generated value in `JWT_SECRET` in `backend/.env`, and set `DATABASE_URL` to your local PostgreSQL connection. A signing secret of at least 32 characters is required; there is no shared fallback.
 
-User Experience
+```sh
+npm run dev
+```
 
-Responsive interface optimized for desktop and mobile devices
-Real-time UI updates following data mutations
-Intuitive navigation and clean interface design
+In a second terminal, from the repository root:
 
-Production Readiness
+```sh
+cd frontend
+npm ci
+cp .env.example .env
+npm run dev
+```
 
-Fully deployed with separate frontend and backend services
-Environment-based configuration
-Production database with Railway PostgreSQL
+Open http://localhost:5173. The API defaults to http://localhost:3000. Set `VITE_API_URL` before building the frontend for another environment.
 
-System Architecture
-job-tracker/
-├── frontend/                 # React single-page application
-│   ├── src/
-│   │   ├── components/      # Reusable UI components
-│   │   ├── App.js          # Root component
-│   │   └── index.js        # Application entry point
-│   └── package.json
-├── backend/                  # Express API server
-│   ├── src/
-│   │   ├── routes/         # API route definitions
-│   │   ├── controllers/    # Business logic layer
-│   │   └── server.ts       # Server configuration
-│   └── package.json
-└── README.md
-Local Development Setup
-System Requirements
+## API
 
-Node.js v16.x or higher
-npm v8.x or higher
-PostgreSQL 12.x or higher (for local development)
+| Method | Route | Purpose |
+| --- | --- | --- |
+| POST | `/auth/signup` | Register with email and password; returns a user and JWT |
+| POST | `/auth/login` | Sign in; returns a user and JWT |
+| GET/POST | `/jobs` | List or create the signed-in user's applications |
+| GET/PUT/DELETE | `/jobs/:id` | Read, replace or delete an owned application |
 
-Installation Instructions
-1. Repository Setup
-bashgit clone https://github.com/ibiraza1077-pixel/job-tracker.git
-cd job-tracker
-2. Backend Configuration
-bashcd backend
-npm install
-3. Frontend Configuration
-bashcd ../frontend
-npm install
-4. Environment Configuration
-Backend .env (in backend/ directory):
-envDATABASE_URL=postgresql://user:password@localhost:5432/job_tracker
-PORT=5000
-NODE_ENV=development
-Frontend .env (in frontend/ directory):
-envREACT_APP_API_URL=http://localhost:5000
-5. Start Development Servers
-Backend server (from backend/ directory):
-bashnpm run dev
-Frontend application (from frontend/ directory):
-bashnpm start
-Access the application at http://localhost:3000
-API Documentation
-Endpoints
-MethodEndpointDescriptionGET/api/applicationsRetrieve all job applicationsGET/api/applications/:idRetrieve specific application by IDPOST/api/applicationsCreate new application recordPUT/api/applications/:idUpdate existing applicationDELETE/api/applications/:idRemove application from system
-Request/Response Examples
-POST /api/applications
-json{
-  "company": "Tech Corp",
-  "position": "Software Engineer",
-  "status": "Applied",
-  "dateApplied": "2024-01-15"
-}
-Response (201 Created)
-json{
-  "id": 1,
-  "company": "Tech Corp",
-  "position": "Software Engineer",
-  "status": "Applied",
-  "dateApplied": "2024-01-15T00:00:00.000Z"
-}
-Deployment Architecture
-Frontend Deployment (Vercel)
+Job requests use `company`, `role`, `status`, `date_applied` (YYYY-MM-DD), and optional `notes`. Protected routes require `Authorization: Bearer <token>` and filter by the authenticated user's ID.
 
-Automated deployments triggered by main branch commits
-Environment variables configured in Vercel dashboard
-Edge network distribution for optimal performance
+## Checks
 
-Backend Deployment (Railway)
+```sh
+npm --prefix frontend run lint
+npm --prefix frontend run build
+npm --prefix backend test
+```
 
-Containerized Node.js application
-Managed PostgreSQL database instance
-Environment-based configuration management
-Automatic SSL certificate provisioning
+For database integration tests, create a **separate disposable database**, apply `backend/schema.sql`, then set `TEST_DATABASE_URL` when running backend tests. These tests exercise signup/login, CRUD and cross-user isolation. CI supplies a temporary PostgreSQL service.
 
-Technical Competencies Demonstrated
-Full-Stack Development
+## Deployment and limitations
 
-End-to-end application architecture from database schema to user interface
-RESTful API design following industry conventions
-Type-safe backend development with TypeScript
-Component-based frontend architecture with React
+Build `frontend/` with `npm run build` and serve its `dist/` directory. Run the API with `npm start` from `backend/`, supplying `DATABASE_URL` and a secret `JWT_SECRET`. Apply the schema before first use; it is not a migration system for existing tables.
 
-Database Management
-
-Relational database design and normalization
-SQL query optimization
-Connection pooling and transaction management
-
-DevOps & Deployment
-
-CI/CD pipeline configuration
-Cloud platform deployment (Vercel, Railway)
-Environment management across development and production
-Git-based version control workflow
-
-Software Engineering Practices
-
-Separation of concerns (MVC pattern)
-Error handling and validation
-Environment-based configuration
-Code organization and modularity
-
-Roadmap
-Authentication & Security
-
-User authentication system with JWT
-Role-based access control
-Password hashing and secure session management
-
-Enhanced Functionality
-
-Advanced search and filtering capabilities
-Data visualization dashboard with charts and statistics
-Email notification system for follow-up reminders
-Document management for resume attachments
-Interview notes and feedback tracking
-
-External Integrations
-
-Job board API integrations (LinkedIn, Indeed)
-Calendar synchronization for interview scheduling
-Email integration for application tracking
-
-User Experience
-
-Dark mode theme
-Customizable dashboard layouts
-Export functionality (CSV, PDF)
-Bulk operations support
-
-Development Methodology
-The project followed a structured software development lifecycle:
-
-Requirements Analysis - Identified core functionality and technical requirements
-System Design - Designed database schema and API architecture
-Implementation - Developed backend API with TypeScript and Express
-Frontend Development - Built React components and user interface
-Integration - Connected frontend to backend via REST API
-Quality Assurance - Conducted functional testing across all features
-Deployment - Configured production environments and deployed services
-Maintenance - Ongoing performance optimization and bug resolution
-
-Contact & Professional Links
-
-GitHub: github.com/ibiraza1077-pixel
-Email: ibiraza1077@gmail.com
-Portfolio: [Your portfolio website]
-LinkedIn: [Your LinkedIn profile]
-
-License
-This project is licensed under the MIT License. See the LICENSE file for details.
-Project Context
-Developed to demonstrate practical software engineering capabilities and full-stack development proficiency. This project showcases the ability to build production-ready applications using modern web technologies and industry-standard development practices.
+This is a portfolio application. Tokens are stored in browser local storage and expire after seven days. Password reset, email verification, rate limiting, server-side session revocation and automated production monitoring are not implemented. Do not describe this as production-grade without those operational controls and deployment verification.
