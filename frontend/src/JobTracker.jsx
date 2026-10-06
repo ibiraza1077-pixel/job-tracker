@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 
-const API_URL = import.meta.env.VITE_API_URL;
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
 
 function JobTracker() {
@@ -15,31 +15,46 @@ function JobTracker() {
   });
   const [editingId, setEditingId] = useState(null);
   const [token, setToken] = useState(localStorage.getItem('token') || '');
-  const [user, setUser] = useState(null);
+  const [jobError, setJobError] = useState('');
   const [authForm, setAuthForm] = useState({ email: '', password: '' });
   const [isLogin, setIsLogin] = useState(true);
   const [authError, setAuthError] = useState('');
 
-  // Set up axios default header when token changes
-  useEffect(() => {
-    if (token) {
-      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-      fetchJobs();
-    }
-  }, [token]);
+  const handleLogout = useCallback(() => {
+    localStorage.removeItem('token');
+    setToken('');
+    setJobs([]);
+    setEditingId(null);
+    setForm({ company: '', role: '', status: 'Applied', date_applied: new Date().toISOString().slice(0, 10), notes: '' });
+  }, []);
 
-  // Fetch all jobs
-  const fetchJobs = async () => {
+  const fetchJobs = useCallback(async (signal) => {
+    if (!token) return;
     try {
-      const response = await axios.get(`${API_URL}/jobs`);
-      setJobs(response.data);
+      const response = await axios.get(`${API_URL}/jobs`, {
+        signal, headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!signal?.aborted) { setJobs(response.data); setJobError(''); }
     } catch (error) {
-      console.error('Error fetching jobs:', error);
-      if (error.response?.status === 401 || error.response?.status === 403) {
-        handleLogout();
-      }
+      if (axios.isCancel(error)) return;
+      if (error.response?.status === 401 || error.response?.status === 403) handleLogout();
+      else setJobError('Could not load applications. Please try again.');
     }
-  };
+  }, [token, handleLogout]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    if (token) axios.get(`${API_URL}/jobs`, {
+      signal: controller.signal, headers: { Authorization: `Bearer ${token}` },
+    }).then(response => { setJobs(response.data); setJobError(''); }).catch(error => {
+      if (axios.isCancel(error)) return;
+      if (error.response?.status === 401 || error.response?.status === 403) handleLogout();
+      else setJobError('Could not load applications. Please try again.');
+    });
+    return () => controller.abort();
+  }, [token, handleLogout]);
+
+  const authConfig = { headers: { Authorization: `Bearer ${token}` } };
 
   // Handle auth form input changes
   const handleAuthChange = (e) => {
@@ -55,21 +70,11 @@ function JobTracker() {
       const response = await axios.post(`${API_URL}${endpoint}`, authForm);
       localStorage.setItem('token', response.data.token);
       setToken(response.data.token);
-      setUser(response.data.user);
       setAuthForm({ email: '', password: '' });
       setAuthError('');
     } catch (error) {
       setAuthError(error.response?.data?.error || 'Authentication failed');
     }
-  };
-
-  // Handle logout
-  const handleLogout = () => {
-    localStorage.removeItem('token');
-    setToken('');
-    setUser(null);
-    setJobs([]);
-    delete axios.defaults.headers.common['Authorization'];
   };
 
   // Handle form input changes
@@ -82,10 +87,10 @@ function JobTracker() {
     e.preventDefault();
     try {
       if (editingId) {
-        await axios.put(`${API_URL}/jobs/${editingId}`, form);
+        await axios.put(`${API_URL}/jobs/${editingId}`, form, authConfig);
         setEditingId(null);
       } else {
-        await axios.post(`${API_URL}/jobs`, form);
+        await axios.post(`${API_URL}/jobs`, form, authConfig);
       }
       setForm({
         company: '',
@@ -96,7 +101,7 @@ function JobTracker() {
       });
       fetchJobs();
     } catch (error) {
-      console.error('Error saving job:', error);
+      setJobError(error.response?.data?.error || 'Could not save the application.');
     }
   };
 
@@ -106,7 +111,7 @@ function JobTracker() {
       company: job.company,
       role: job.role,
       status: job.status,
-      date_applied: job.date_applied.split('T')[0],
+      date_applied: job.date_applied ? job.date_applied.split('T')[0] : '',
       notes: job.notes || ''
     });
     setEditingId(job.id);
@@ -116,10 +121,10 @@ function JobTracker() {
   const handleDelete = async (id) => {
     if (window.confirm('Are you sure you want to delete this application?')) {
       try {
-        await axios.delete(`${API_URL}/jobs/${id}`);
+        await axios.delete(`${API_URL}/jobs/${id}`, authConfig);
         fetchJobs();
       } catch (error) {
-        console.error('Error deleting job:', error);
+        setJobError(error.response?.data?.error || 'Could not delete the application.');
       }
     }
   };
@@ -202,6 +207,7 @@ function JobTracker() {
         </button>
       </div>
       
+      {jobError && <p role="alert">{jobError}</p>}
       {/* Form */}
       <form onSubmit={handleSubmit} style={{ background: '#f8f9fa', padding: '20px', borderRadius: '8px', marginBottom: '30px' }}>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '15px' }}>

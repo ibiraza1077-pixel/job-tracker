@@ -18,7 +18,35 @@ const pool = new Pool({
 });
 
 // JWT secret
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET || JWT_SECRET.length < 32) {
+  throw new Error('Set JWT_SECRET to a random secret of at least 32 characters.');
+}
+if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL is required.');
+
+const validateAuth = (req, res, next) => {
+  const { email, password } = req.body || {};
+  if (typeof email !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ||
+      typeof password !== 'string' || password.length < 6 || Buffer.byteLength(password) > 72) {
+    return res.status(400).json({ error: 'Provide a valid email and a password of 6–72 bytes.' });
+  }
+  next();
+};
+const validateJob = (req, res, next) => {
+  const { company, role, status, date_applied, notes } = req.body || {};
+  if (typeof company !== 'string' || !company.trim() || company.length > 200 ||
+      typeof role !== 'string' || !role.trim() || role.length > 200 ||
+      (status != null && !['Applied', 'Interview', 'Offer', 'Rejected'].includes(status)) ||
+      (date_applied != null && (!/^\d{4}-\d{2}-\d{2}$/.test(date_applied) ||
+        Number.isNaN(Date.parse(date_applied)) || new Date(date_applied).toISOString().slice(0, 10) !== date_applied)) ||
+      (notes != null && (typeof notes !== 'string' || notes.length > 10000))) {
+    return res.status(400).json({ error: 'Provide a company, role, valid status and date, and notes under 10000 characters.' });
+  }
+  req.body.company = company.trim(); req.body.role = role.trim();
+  req.body.status = status || 'Applied';
+  req.body.date_applied = date_applied || new Date().toISOString().slice(0, 10);
+  next();
+};
 
 // Auth middleware
 const authenticateToken = (req, res, next) => {
@@ -46,7 +74,7 @@ app.get('/', (req, res) => {
 // AUTH ROUTES
 
 // Signup
-app.post('/auth/signup', async (req, res) => {
+app.post('/auth/signup', validateAuth, async (req, res) => {
   try {
     const { email, password } = req.body;
     
@@ -71,12 +99,13 @@ app.post('/auth/signup', async (req, res) => {
     
     res.status(201).json({ user: result.rows[0], token });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error('Request failed:', error);
+    res.status(500).json({ error: 'Unable to complete the request.' });
   }
 });
 
 // Login
-app.post('/auth/login', async (req, res) => {
+app.post('/auth/login', validateAuth, async (req, res) => {
   try {
     const { email, password } = req.body;
     
@@ -99,7 +128,8 @@ app.post('/auth/login', async (req, res) => {
     
     res.json({ user: { id: user.id, email: user.email }, token });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error('Request failed:', error);
+    res.status(500).json({ error: 'Unable to complete the request.' });
   }
 });
 
@@ -114,7 +144,8 @@ app.get('/jobs', authenticateToken, async (req, res) => {
     );
     res.json(result.rows);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error('Request failed:', error);
+    res.status(500).json({ error: 'Unable to complete the request.' });
   }
 });
 
@@ -131,12 +162,13 @@ app.get('/jobs/:id', authenticateToken, async (req, res) => {
     }
     res.json(result.rows[0]);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error('Request failed:', error);
+    res.status(500).json({ error: 'Unable to complete the request.' });
   }
 });
 
 // POST create new job
-app.post('/jobs', authenticateToken, async (req, res) => {
+app.post('/jobs', authenticateToken, validateJob, async (req, res) => {
   try {
     const { company, role, status, date_applied, notes } = req.body;
     const result = await pool.query(
@@ -145,12 +177,13 @@ app.post('/jobs', authenticateToken, async (req, res) => {
     );
     res.status(201).json(result.rows[0]);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error('Request failed:', error);
+    res.status(500).json({ error: 'Unable to complete the request.' });
   }
 });
 
 // PUT update job
-app.put('/jobs/:id', authenticateToken, async (req, res) => {
+app.put('/jobs/:id', authenticateToken, validateJob, async (req, res) => {
   try {
     const { id } = req.params;
     const { company, role, status, date_applied, notes } = req.body;
@@ -163,7 +196,8 @@ app.put('/jobs/:id', authenticateToken, async (req, res) => {
     }
     res.json(result.rows[0]);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error('Request failed:', error);
+    res.status(500).json({ error: 'Unable to complete the request.' });
   }
 });
 
@@ -180,11 +214,13 @@ app.delete('/jobs/:id', authenticateToken, async (req, res) => {
     }
     res.json({ message: 'Job deleted successfully' });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error('Request failed:', error);
+    res.status(500).json({ error: 'Unable to complete the request.' });
   }
 });
 
 // Start server
-app.listen(port, () => {
-  console.log(`Server running on http://localhost:${port}`);
-});
+if (require.main === module) {
+  app.listen(port, () => console.log(`Server running on http://localhost:${port}`));
+}
+module.exports = { app, pool };
