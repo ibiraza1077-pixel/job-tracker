@@ -65,6 +65,16 @@ For database integration tests, create a **separate disposable database**, apply
 
 ## Deployment and limitations
 
+### Free demo hosting
+
+The root `render.yaml` defines a **Free** Render API service and generates its JWT secret. Use a **Free** Neon PostgreSQL project for persistent data. Supply its connection string as `DATABASE_URL` in Render, including the TLS parameters Neon provides. Apply `backend/schema.sql` to the new database using Neon's SQL editor before using the app. Never commit credentials.
+
+Set `VITE_API_URL` in Vercel to the deployed Render API URL and redeploy the frontend. Existing Railway data is not transferred automatically: preserve the old database and export/import it separately if needed. Do not apply the initial schema blindly to an existing database.
+
+Render free APIs sleep after 15 idle minutes and can take about a minute to wake. The workspace shares 750 free instance hours each month. Use Free plans and leave payment details unset to avoid overage billing; demos may pause when free quotas run out. Render's free PostgreSQL expires after 30 days, so it is unsuitable for the lasting demo database. See [Render limits](https://render.com/docs/free) and [Neon's free plan](https://neon.com/pricing).
+
+### Operational limitations
+
 Build `frontend/` with `npm run build` and serve its `dist/` directory. Run the API with `npm start` from `backend/`, supplying `DATABASE_URL` and a secret `JWT_SECRET`. Apply the schema before first use; it is not a migration system for existing tables.
 
 This is a portfolio application. Tokens are stored in browser local storage and expire after seven days. Password reset, email verification, rate limiting, server-side session revocation and automated production monitoring are not implemented. Do not describe this as production-grade without those operational controls and deployment verification.
