@@ -1,5 +1,7 @@
 # Job Tracker
 
+A portfolio project by Ibrahim, a final-year Computer Science student seeking internship opportunities. This project explores relational data modelling, authentication and full-stack application development.
+
 Track job applications with a React interface and an Express/PostgreSQL API. Users register or sign in, then manage their own applications across Applied, Interview, Offer and Rejected statuses.
 
 ## Architecture
